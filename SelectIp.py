@@ -1,66 +1,16 @@
-# Define here the models for your spider middleware
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/spider-middleware.html
+# -*- coding: utf-8 -*-
+# @Time    : 2021/12/4 11:31
+# @Author  : HPTOUS
+# @FileName: SelectIp.py
+# @describe: 定时清除无用ip
+# @Software: PyCharm
 import random
 
-from scrapy import signals
-
-# useful for handling different item types with a single interface
-from itemadapter import is_item, ItemAdapter
+import pymysql
+import requests
 
 
-class ScrapyFinalWorkSpiderMiddleware:
-    # Not all methods need to be defined. If a method is not defined,
-    # scrapy acts as if the spider middleware does not modify the
-    # passed objects.
-
-    @classmethod
-    def from_crawler(cls, crawler):
-        # This method is used by Scrapy to create your spiders.
-        s = cls()
-        crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
-        return s
-
-    def process_spider_input(self, response, spider):
-        # Called for each response that goes through the spider
-        # middleware and into the spider.
-
-        # Should return None or raise an exception.
-        return None
-
-    def process_spider_output(self, response, result, spider):
-        # Called with the results returned from the Spider, after
-        # it has processed the response.
-
-        # Must return an iterable of Request, or item objects.
-        for i in result:
-            yield i
-
-    def process_spider_exception(self, response, exception, spider):
-        # Called when a spider or process_spider_input() method
-        # (from other spider middleware) raises an exception.
-
-        # Should return either None or an iterable of Request or item objects.
-        pass
-
-    def process_start_requests(self, start_requests, spider):
-        # Called with the start requests of the spider, and works
-        # similarly to the process_spider_output() method, except
-        # that it doesn’t have a response associated.
-
-        # Must return only requests (not items).
-        for r in start_requests:
-            yield r
-
-    def spider_opened(self, spider):
-        spider.logger.info('Spider opened: %s' % spider.name)
-
-
-class ScrapyFinalWorkDownloaderMiddleware:
-    # Not all methods need to be defined. If a method is not defined,
-    # scrapy acts as if the downloader middleware does not modify the
-    # passed objects.
+class SelectIP:
     user_agents = [
         'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36 OPR/26.0.1656.60',
         'Opera/8.0 (Windows NT 5.1; U; en)',
@@ -114,28 +64,85 @@ class ScrapyFinalWorkDownloaderMiddleware:
         "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
         "Mozilla/5.0 (X11; U; Linux x86_64; zh-CN; rv:1.9.2.10) Gecko/20100922 Ubuntu/10.10 (maverick) Firefox/3.6.10"
     ]
+    connect = None
+    cursor = None
+    github = r"https://www.github.com"
 
-    # 拦截请求
-    def process_request(self, request, spider):
-        # UA伪装
-        request.headers["User-Agent"] = random.choice(self.user_agents)
-        return None
+    def __init__(self):
+        print("数据库开启")
+        self.connect = pymysql.Connect(
+            host='120.27.245.194',
+            port=3306,
+            user='root',
+            password='Zx4653397..',
+            database='github',
+            charset='utf8')
 
-    # 拦截所有的响应
-    def process_response(self, request, response, spider):
-        # Called with the response returned from the downloader.
+    def Select_Http_HTTPS(self, table):
+        self.cursor = self.connect.cursor()
+        try:
+            print(f"开始重新检查{table}并清洗ip池")
+            sql = f'select id, ip, port from {table};'
+            self.cursor.execute(sql)
+            proxies_dict = self.cursor.fetchall()
+            print(f"当前{table}池的ip数量：{len(proxies_dict)}")
+            if not proxies_dict is None or len(proxies_dict) > 0:
+                # print(proxies_dict)
+                idPond = self.Judge_IP(proxies_dict, table)
+                if not idPond is None or len(idPond) > 0:
+                    self.Delete_Invalid_Ip(idPond, table)
+                    print(f"{table}的IP池刷新成功")
+                    print(f"经过清洗后的{table}ip池数量：{len(proxies_dict) - len(idPond)}")
+            else:
+                print(f"{table}ip池为空")
+        except Exception as e:
+            self.connect.rollback()
 
-        # Must either;
-        # - return a Response object
-        # - return a Request object
-        # - or raise IgnoreRequest
-        return response
+    def Delete_Invalid_Ip(self, idPond, table):
+        print(f"开始删除{table}无效ip")
+        try:
+            # 'delete from HTTP where id=%d' % (13003)
+            sql = f'delete from {table} where id=%s'
+            self.cursor.executemany(sql, idPond)
+            self.connect.commit()
+            print(f"{table}无效ip删除成功")
+        except Exception as e:
+            print(f"删除{table}无效ip发生异常")
+            self.connect.rollback()
 
-    # 拦截发生异常的请求
-    def process_exception(self, request, exception, spider):
-        # 代理
+    def Judge_IP(self, dic, table):
+        idPond = []
+        print(f"开始对{table}IP池进行验证")
+        for i in range(len(dic)):
+            ip = dic[i][1]
+            port = dic[i][2]
+            proxies = {
+                f"{table.lower}": f"{table.lower}://{ip}:{port}"
+            }
+            headers = {
+                "User-Agent": random.choice(self.user_agents)
+            }
+            try:
+                resp = requests.get(url=self.github, proxies=proxies, headers=headers, timeout=3)
+                if not resp.status_code == 200:
+                    idPond.append(dic[i][0])
+                else:
+                    print(f"{proxies}ip有效")
+                    continue
+            except Exception as e:
+                idPond.append(dic[i][0])
+                # print(e)
+                # print("访问超时")
+        print(f"{table}IP池清晰完成")
+        return idPond
 
-        pass
+    def __del__(self):
+        print("数据库关闭")
+        self.cursor.close()
+        self.connect.close()
 
-    def spider_opened(self, spider):
-        spider.logger.info('Spider opened: %s' % spider.name)
+
+if __name__ == '__main__':
+    selectip = SelectIP()
+    selectip.Select_Http_HTTPS("HTTP")
+    selectip.Select_Http_HTTPS("HTTPS")

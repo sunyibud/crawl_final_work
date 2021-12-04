@@ -7,6 +7,8 @@
 # useful for handling different item types with a single interface
 import traceback
 import time
+
+import pymysql
 from itemadapter import ItemAdapter
 import logging
 
@@ -28,7 +30,7 @@ class ScrapyFinalWorkPipeline:
         self.f_log = open('./githubinfo.log', 'a', encoding='utf-8')
 
     def process_item(self, item, spider):
-        project_path = item["project_path"]  # 仓库路径
+        project_path = item['project_path']  # 仓库路径
         project_star = item["project_star"]  # 项目获得的star数量
         project_fork = item["project_fork"]  # 项目获得的fork数量
         project_revise_time = item["project_revise_time"]  # 项目最后修改的时间
@@ -48,3 +50,81 @@ class ScrapyFinalWorkPipeline:
         print("结束爬虫....")
         self.fp.close()
         self.f_log.close()
+
+
+# 存入项目信息
+class MysqlProjectsPipeline:
+    # 连接数据库
+    connect = None
+    # 游标
+    cursor = None
+
+    def open_spider(self, spider):
+        print("数据库连接projects开启")
+        self.connect = pymysql.Connect(
+            host='120.27.245.194',
+            port=3306,
+            user='root',
+            password='Zx4653397..',
+            database='github',
+            charset='utf8')
+
+    def process_item(self, item, spider):
+        # 创建一个游标对象
+        self.cursor = self.connect.cursor()
+        try:
+            # 游标插入数据
+            self.cursor.execute(
+                'insert into Projects values(NULL,"%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")'
+                % (item["project_belong_topic"], item["project_name"], item["project_owner"], item["project_path"],
+                   item["project_star"],
+                   item["project_fork"], item["project_revise_time"], item["project_commit_number"],
+                   item["project_label"], item["project_languages"], item["project_describe"],
+                   item["project_download_zip"], item["project_clone_ssh"]))
+            self.connect.commit()
+        except Exception as e:
+            print("project", e)
+            self.connect.rollback()
+        return item
+
+    def close_spider(self, spider):
+        print("数据库projects连接关闭")
+        self.cursor.close()
+        self.connect.close()
+
+
+# 存入topic信息
+class MysqlTopicsPipeline:
+    # 连接数据库
+    connect = None
+    # 游标
+    cursor = None
+
+    def open_spider(self, spider):
+        print("数据库topics连接开启")
+        self.connect = pymysql.Connect(
+            host='120.27.245.194',
+            port=3306,
+            user='root',
+            password='Zx4653397..',
+            database='github',
+            charset='utf8')
+
+    def process_item(self, item, spider):
+        # 创建一个游标对象
+        self.cursor = self.connect.cursor()
+        try:
+            # 游标插入数据
+            self.cursor.execute(
+                'insert into Topics values(NULL,"%s","%s","%s")'
+                % (item["Topic_name"], item["topic_number"], item["topic_describe"]))
+            self.connect.commit()
+        except Exception as e:
+            print("topic", e)
+            self.connect.rollback()
+        return item
+
+    def close_spider(self, spider):
+        print("数据库topics连接关闭")
+        self.cursor.close()
+        self.connect.close()

@@ -48,7 +48,7 @@ def Judgement_Date(file_revise_time):
     # 将月份从数字重新变成英文简写
     for i in range(len(file_revise_time)):
         file_revise_time[i][0] = month[file_revise_time[i][0]]
-    print("5", file_revise_time)
+    # print("5", file_revise_time)
 
     if file_revise_time == "" or file_revise_time is None or len(file_revise_time) == 0:
         return "Null"
@@ -66,8 +66,12 @@ class GithubSpider(scrapy.Spider):
     start_urls = ['https://github.com/explore']  #
     # github起始位置
     github_Href = "https://github.com/"
+    # 总共要爬取的topics页码的数量， 一页30个
+    page_topics = 6
+    # 总共要爬取的项目界面数量
+    page_projects = 3
     # 每个板块需要爬取的项目数量
-    topic_number = 100
+    topic_projects_number = 100
     allow_number = 0
 
     # 获取每个板块的信息
@@ -83,15 +87,18 @@ class GithubSpider(scrapy.Spider):
             dic['name'] = div.xpath('./a[1]/div/div/p[1]/text()').extract_first().strip()
             dic['describe'] = div.xpath('./a[1]/div/div/p[2]/text()').extract_first().strip()
             # print(dic)
-            # 进入分区
-            yield scrapy.Request(url=dic['href'], callback=self.parse_get_topic_info, meta={"dic": dic})
-            # if self.allow_number > 2:
-            #     break
-            break
+            # 进入分区,加载projects的页面
+            for i in range(1, self.page_projects + 1):
+                print(f"加载projects的第{i}页")
+                page_projects_url = dic['href'] + f"&page={i}"
+                yield scrapy.Request(url=page_projects_url, callback=self.parse_get_topic_info, meta={"dic": dic})
+                # break
 
     # 获取每个板块内项目的信息
     def parse_get_topic_info(self, response):
-        print("测试进入parse_get_topic_info")
+        # 获得板块信息
+        topic_info = response.meta["dic"]
+        # print("测试进入parse_get_topic_info")
         # 界面详情介绍
         detail_describe = response.xpath(
             '//*[@id="js-pjax-container"]/div[2]/div[2]/div/div[1]/div[1]/div/p/text()').extract_first()
@@ -104,6 +111,12 @@ class GithubSpider(scrapy.Spider):
         # 连接列表
         topic_project_number = "".join(obj_number.findall(topic_project_number)).strip()
         # print(topic_project_number)
+        # Topic_item = ScrapyFinalWorkItem()  # 实例化item对象
+        # Topic_item["Topic_name"] = topic_info.get("name", "Null")  # 将topic的名字存入
+        # Topic_item["topic_number"] = topic_project_number  # 将topic赋值给item对象
+        # Topic_item["topic_describe"] = topic_info.get("describe", "Null")  # 将描述赋值给item对象
+        # yield Topic_item
+        topic_info["number"] = topic_project_number
         # 获取当前页的所有项目的列表
         article_lst = response.xpath('//*[@id="js-pjax-container"]/div[2]/div[2]/div/div[1]/article')
         # print(div_project_lst)
@@ -113,12 +126,6 @@ class GithubSpider(scrapy.Spider):
             # 对获取的项目路径列表进行数据清洗
             project_path = [project_path[i].strip().replace(" ", "") for i in range(len(project_path))]
             project_path = "".join(project_path).strip()
-            # 获取仓库所属用户名
-            project_username = project_path.split("/")[0]
-            # print("project_username", project_username)
-            # 获取仓库名字
-            project_name = project_path.split("/")[-1]
-            # print("project_name", project_name)
             # 拼接仓库链接
             project_url = self.github_Href + project_path
             # 获得clone的 https 链接
@@ -128,13 +135,24 @@ class GithubSpider(scrapy.Spider):
             project_clone_ssh = "git@github.com:" + project_path + ".git"
             # print("project_clone_ssh", project_clone_ssh)
             yield scrapy.Request(url=project_url, callback=self.parse_project_detail_info,
-                                 meta={"project_path": project_path})
+                                 meta={"project_path": project_path, "topic_info": topic_info})
             # break
 
     # 获得每个项目内的具体信息
     def parse_project_detail_info(self, response):
+        # 获得项目路径
         project_path = response.meta["project_path"]
-        print("测试是否进入parse_project_detail_info")
+        # print("project", project_path)
+        # 获得当前项目所属板块信息
+        topic_info = response.meta["topic_info"]
+        # print("topic", topic_info)
+        # 获取仓库所属用户名
+        project_username = project_path.split("/")[0]
+        # print("project_username", project_username)
+        # 获取仓库名字
+        project_name = project_path.split("/")[-1]
+        # print("project_name", project_name)
+        # print("测试是否进入parse_project_detail_info")
         # 获得 star 与 fork 的数量标签
         project_li_line = response.xpath('//*[@id="repository-container-header"]/div[1]/ul/li')
         # print("project_li_line", project_li_line.extract())
@@ -171,16 +189,16 @@ class GithubSpider(scrapy.Spider):
         # //*[@id="repo-content-pjax-container"]/div/div[2]/div[1]/div[2]/div[1]/div/div[2]/div[2]//relative-time/text()
         # 判断获取的是否为空
         if project_revise_time is None or len(project_revise_time) == 0 or project_revise_time == "":
-            print("进入获得时间格式if")
+            # print("进入获得时间格式if")
             # 如果没有从主页获得则从文件修改时间获取
             project_final_revise_time_list = response.xpath(
                 '//*[@id="repo-content-pjax-container"]/div/div[2]/div[1]/div[2]/div[3]/div[1]/div[@role="row"]//time-ago/text()').extract()
-            print("project_final_revise_time_list", project_final_revise_time_list)
+            # print("project_final_revise_time_list", project_final_revise_time_list)
             # 将时间设置为文件最后修改时间
             project_revise_time = Judgement_Date(project_final_revise_time_list)
         else:
             # 如果不为空，则对数据格式进行修改将其从 "month day, year"格式变为 "month day year"
-            print("进入修改时间格式else")
+            # print("进入修改时间格式else")
             project_revise_time = re.split(r"[,\s+]", project_revise_time)
             project_revise_time.remove("")
             project_revise_time = " ".join(project_revise_time)
@@ -229,8 +247,15 @@ class GithubSpider(scrapy.Spider):
             project_languages = "".join(project_languages)  # .split("%")
             # project_languages.pop()
         # print("project_languages", project_languages)
+        # 获得clone的 ssh 链接
+        project_clone_ssh = "git@github.com:" + project_path + ".git"
+        # print("project_clone_ssh", project_clone_ssh)
+        # print("project_path", self.github_Href + project_path)
         item = ScrapyFinalWorkItem()
-        item["project_path"] = project_path  # 仓库路径
+        item["project_belong_topic"] = topic_info.get("name", "Null")  # 获得当前项目所属的类别
+        item["project_owner"] = project_username  # 仓库所属用户
+        item["project_name"] = project_name  # 项目名
+        item["project_path"] = self.github_Href + project_path  # 项目网址
         item["project_star"] = project_star  # 项目获得的star数量
         item["project_fork"] = project_fork  # 项目获得的fork数量
         item["project_revise_time"] = project_revise_time  # 项目最后修改的时间
@@ -239,6 +264,11 @@ class GithubSpider(scrapy.Spider):
         item["project_describe"] = project_describe  # 项目的描述
         item["project_label"] = project_label  # 项目的标签
         item["project_languages"] = project_languages  # 项目中所使用的语言及百分比
+        item["project_clone_ssh"] = project_clone_ssh  # 项目的ssh链接
+        item["project_download_zip"] = project_download_zip  # 项目的zip链接
+        item["Topic_name"] = topic_info.get("name", "Null")  # 将topic的名字存入
+        item["topic_number"] = topic_info.get("number", "Null")  # 将topic赋值给item对象
+        item["topic_describe"] = topic_info.get("describe", "Null")  # 将描述赋值给item对象
         yield item
 
     def parse(self, response):
@@ -249,5 +279,9 @@ class GithubSpider(scrapy.Spider):
         Collection_Href = self.github_Href + kinds_lst[3]  # Collections 界面
         events = self.github_Href + kinds_lst[4]  # events 界面
         # print(kinds_lst)
-        # 进入 topics 界面
-        yield scrapy.Request(url=Topics_Href, callback=self.parse_get_topics)
+        # 进入 topics 界面, 共 6 页， 每页三十个板块，加载topics界面
+        for i in range(1, self.page_topics + 1):
+            print(f"加载topics的第{i}页")
+            Topics_Href = Topics_Href + f"?page={i}"
+            yield scrapy.Request(url=Topics_Href, callback=self.parse_get_topics)
+            # break
