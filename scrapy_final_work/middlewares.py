@@ -114,7 +114,6 @@ class ScrapyFinalWorkDownloaderMiddleware:
         "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
         "Mozilla/5.0 (X11; U; Linux x86_64; zh-CN; rv:1.9.2.10) Gecko/20100922 Ubuntu/10.10 (maverick) Firefox/3.6.10"
     ]
-
     # 拦截请求
     def process_request(self, request, spider):
         # UA伪装
@@ -131,11 +130,15 @@ class ScrapyFinalWorkDownloaderMiddleware:
         # - or raise IgnoreRequest
         return response
 
+    proxies = {
+        "": ""
+    }
+
     # 拦截发生异常的请求
     def process_exception(self, request, exception, spider):
         # 代理
-
-        pass
+        request.meta['proxy'] = ""
+        return request
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)

@@ -32,7 +32,7 @@ headers = {
 }
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 resp = requests.get(url=url, headers=headers, verify=False)
-with open('./githubdemo.html', 'w', encoding='utf-8') as f:
+with open('githubdemo.html', 'w', encoding='utf-8') as f:
     f.write(resp.text)
 tree = etree.HTML(resp.text)
 resp.close()
