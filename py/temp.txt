@@ -1,0 +1,55 @@
+def author_world_map(projects):
+    print("正在绘制项目作者地区分布图")
+    world_map_chart = pygal_maps_world.maps.World()
+    world_map_chart.title = "项目作者所属国家分布"
+    world_map_chart.add("600+", {
+        'us': 7714,
+        'cn': 2231,
+        'in': 2002,  # 印度
+        'gb': 1292,  # United Kingdom，英国
+        'de': 919,  # 德国
+        'br': 808,  # 巴西
+        'ca': 731,
+        'fr': 702,  # 法国
+        'ru': 681,  # 俄国
+        'at': 629,  # 澳大利亚
+    })
+    world_map_chart.add("30-600", {
+        "jp": 523,
+        "hk": 234,
+        "tw": 243,
+        "it": 334,
+        "kr": 323,
+        "mo": 300,
+        "ca": 245,
+        "br": 123,
+        "th": 32,
+        "ar": 31,
+        "co": 36,
+        "pt": 45,
+        "pk": 47,
+        "pl": 48,
+        "bd": 40,
+        "se": 30,
+        "tr": 34,
+        "ve": 32,
+        "gb": 32,
+    })
+    world_map_chart.add("1-30", {
+        "nl": 3,
+        "hu": 1,
+        "cl": 23,
+        "ph": 21,
+        "my": 12,
+        "kr": 3,
+        "uy": 1,
+        "ro": 1,
+        "eg": 1,
+        "ke": 1,
+        "kp": 3,
+        "cz": 6,
+        "sk": 8,
+        "mg": 2,
+    })
+    world_map_chart.render_to_file('./results/author_world.svg')
+    print("绘制成功")
